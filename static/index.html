@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Article Outliner</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">AO</div>
+        <div>
+          <h1>Article Outliner</h1>
+          <p>Private web clips</p>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="icon-button" id="refreshButton" type="button" aria-label="更新" title="更新">R</button>
+        <button class="primary-button" id="newButton" type="button">新規</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="sidebar">
+        <div class="search-row">
+          <input id="searchInput" type="search" autocomplete="off" placeholder="タイトル・URL・本文を検索">
+          <div class="search-meta" id="searchMeta">All saved articles</div>
+        </div>
+        <div class="article-list" id="articleList" aria-label="保存記事"></div>
+      </aside>
+
+      <section class="editor-pane" id="editorPane">
+        <div class="pane-head">
+          <div>
+            <h2>Clip</h2>
+            <p id="saveStatus">Ready</p>
+          </div>
+          <button class="primary-button" id="saveButton" type="button">保存</button>
+        </div>
+        <div class="field-grid">
+          <label>
+            <span>Title</span>
+            <input id="titleInput" type="text" autocomplete="off">
+          </label>
+          <label>
+            <span>Source URL</span>
+            <input id="urlInput" type="url" autocomplete="off">
+          </label>
+        </div>
+        <div class="paste-frame">
+          <div id="pasteSurface" class="paste-surface" contenteditable="true" spellcheck="false" aria-label="HTML paste area"></div>
+        </div>
+      </section>
+
+      <section class="reader-pane" id="readerPane" hidden>
+        <div class="pane-head reader-head">
+          <div class="reader-title-block">
+            <h2 id="readerTitle"></h2>
+            <a id="readerSource" href="#" target="_blank" rel="noopener noreferrer"></a>
+          </div>
+          <div class="toolbar compact">
+            <button class="ghost-button" id="toggleArticleButton" type="button">Article</button>
+            <button class="ghost-button" id="collapseAllButton" type="button">Collapse</button>
+            <button class="ghost-button" id="expandAllButton" type="button">Expand</button>
+            <button class="danger-button" id="deleteButton" type="button">削除</button>
+          </div>
+        </div>
+        <div class="reader-layout">
+          <nav class="outline" id="outline" aria-label="見出し"></nav>
+          <article class="article-body" id="articleBody"></article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
