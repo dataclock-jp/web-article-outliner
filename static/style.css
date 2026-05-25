@@ -176,7 +176,7 @@ p {
 }
 
 .sidebar {
-  min-height: calc(100vh - 118px);
+  min-height: calc(100dvh - 90px);
   padding: 12px;
   position: sticky;
   top: 16px;
@@ -282,12 +282,12 @@ select:focus {
 
 .editor-pane,
 .reader-pane {
-  min-height: calc(100vh - 118px);
+  min-height: calc(100dvh - 90px);
   overflow: hidden;
 }
 
 .reader-pane:not([hidden]) {
-  height: calc(100vh - 118px);
+  height: calc(100dvh - 90px);
   display: flex;
   flex-direction: column;
 }
@@ -518,9 +518,12 @@ label span {
 }
 
 .summary-panel {
+  flex: 0 0 auto;
+  max-height: min(32dvh, 260px);
   padding: 13px 16px 14px;
   border-bottom: 1px solid var(--line);
   background: #f8faf8;
+  overflow: auto;
 }
 
 .summary-panel span {
@@ -659,6 +662,10 @@ label span {
     grid-template-columns: 1fr;
   }
 
+  .reader-layout {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
   .outline {
     border-right: 0;
     border-bottom: 1px solid var(--line);
@@ -667,10 +674,6 @@ label span {
 
   .reader-head {
     display: grid;
-  }
-
-  .reader-pane:not([hidden]) {
-    height: auto;
   }
 
   .toolbar.compact {
@@ -689,9 +692,18 @@ label span {
   }
 
   .sidebar {
-    min-height: calc(100vh - 94px);
+    min-height: calc(100dvh - 82px);
     padding: 8px;
     top: 8px;
+  }
+
+  .editor-pane,
+  .reader-pane {
+    min-height: calc(100dvh - 82px);
+  }
+
+  .reader-pane:not([hidden]) {
+    height: calc(100dvh - 82px);
   }
 
   .article-item {
