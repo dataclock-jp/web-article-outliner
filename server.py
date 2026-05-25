@@ -27,6 +27,7 @@ CLIP_KEY_PATH = DATA_DIR / "clip_key.txt"
 MAX_REQUEST_BYTES = 15 * 1024 * 1024
 MAX_FETCH_BYTES = 5 * 1024 * 1024
 MAX_WEB_COLLECT_COUNT = 10
+MAX_SEARCH_RESULTS = MAX_WEB_COLLECT_COUNT * 5
 SUMMARY_TARGET_CHARS = 1000
 HTTP_TIMEOUT_SECONDS = 15
 USER_AGENT = "ArticleOutliner/0.2 (+https://github.com/dataclock-jp/web-article-outliner)"
@@ -63,6 +64,16 @@ SUMMARY_STOPWORDS = {
     "もの",
     "よう",
 }
+NSFW_PATTERNS = [
+    re.compile(
+        r"\b(?:18\+|adult\s*(?:content|site|video)|camgirl|erotic|escort|fetish|hentai|jav|nude|naked|onlyfans|porn|porno|pornhub|sex|xxx|xvideos|xnxx)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(18禁|av動画|jav|nsfw|アダルト|アダルト動画|エロ|えろ|ヌード|ポルノ|官能|性的|成人向け|風俗|裸|裸体|猥褻|わいせつ)",
+        re.IGNORECASE,
+    ),
+]
 
 
 def now_iso() -> str:
@@ -435,6 +446,16 @@ def extract_text(raw_html: str) -> str:
     return parser.text()
 
 
+def nsfw_reason(value: str) -> str:
+    normalized = normalize_plain_text(value).lower()
+    if not normalized:
+        return ""
+    for pattern in NSFW_PATTERNS:
+        if pattern.search(normalized):
+            return "local NSFW keyword match"
+    return ""
+
+
 def http_get_text(url: str, timeout: int = HTTP_TIMEOUT_SECONDS) -> str:
     request = urlrequest.Request(
         url,
@@ -785,26 +806,59 @@ def collect_web_articles(keyword: str, mode: str, count: int, allow_nsfw: bool =
     if count < 1 or count > MAX_WEB_COLLECT_COUNT:
         raise ValueError(f"Count must be between 1 and {MAX_WEB_COLLECT_COUNT}")
 
-    results = search_web(keyword, mode, count, allow_nsfw=allow_nsfw)
+    keyword_nsfw_reason = "" if allow_nsfw else nsfw_reason(keyword)
+    if keyword_nsfw_reason:
+        return {
+            "keyword": keyword,
+            "mode": mode,
+            "allow_nsfw": allow_nsfw,
+            "requested_count": count,
+            "search_results": [],
+            "imported": [],
+            "skipped": [],
+            "filtered": [{"url": "", "title": keyword, "reason": "NSFW keyword blocked because NSFW is not allowed"}],
+            "failed": [],
+        }
+
+    search_count = min(MAX_SEARCH_RESULTS, max(count * 5, count + 10))
+    results = search_web(keyword, mode, search_count, allow_nsfw=allow_nsfw)
     imported: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
+    filtered: list[dict[str, str]] = []
     failed: list[dict[str, str]] = []
+    handled = 0
 
     for result in results:
+        if handled >= count:
+            break
+
         url = result["url"]
+        result_reason = "" if allow_nsfw else nsfw_reason(f"{result.get('title', '')} {url}")
+        if result_reason:
+            filtered.append({"url": url, "title": result["title"], "reason": result_reason})
+            continue
+
         existing = find_article_by_source_url(url)
         if existing is not None:
             skipped.append({"url": url, "title": existing["title"], "reason": "already saved", "id": existing["id"]})
+            handled += 1
             continue
 
         try:
             page_html = http_get_text(url)
             readable_html = extract_readable_html(page_html, url)
             title = extract_page_title(page_html) or result["title"]
+            body_text = extract_text(readable_html)
+            page_reason = "" if allow_nsfw else nsfw_reason(f"{title} {url} {body_text[:4000]}")
+            if page_reason:
+                filtered.append({"url": url, "title": title, "reason": page_reason})
+                continue
             article = create_article_record({"title": title, "source_url": url, "html": readable_html})
             imported.append({key: article[key] for key in ("id", "title", "source_url", "summary")})
+            handled += 1
         except Exception as exc:
             failed.append({"url": url, "title": result["title"], "error": str(exc)})
+            handled += 1
 
     return {
         "keyword": keyword,
@@ -814,6 +868,7 @@ def collect_web_articles(keyword: str, mode: str, count: int, allow_nsfw: bool =
         "search_results": results,
         "imported": imported,
         "skipped": skipped,
+        "filtered": filtered,
         "failed": failed,
     }
 

@@ -26,7 +26,9 @@ Use `Web Collect` to enter a keyword, choose a search mode, and save the top res
 - `あいまい`: searches the unquoted keyword.
 - `NSFWを許可`: turns off the search provider safe-search hint for that collection run. It is off by default.
 
-The server uses a lightweight web search page and then fetches each result URL. Some sites may block automated fetches or return content that cannot be imported; those entries are reported as failed while other results continue. The NSFW setting is best-effort because it depends on the search provider's filtering.
+The server uses a lightweight web search page and then fetches each result URL. Some sites may block automated fetches or return content that cannot be imported; those entries are reported as failed while other results continue.
+
+When NSFW is not allowed, the app also applies a local keyword-based filter to the search keyword, result title/URL, and fetched body text before saving. Filtered entries are reported separately from skipped or failed entries. This local filter is deterministic, but it is still a heuristic and may produce false positives or false negatives.
 
 ## Summaries
 

@@ -43,8 +43,9 @@ Single personal user. The first version is optimized for private self-hosted use
   - Acceptance: `POST /api/web-collect` with `{ "keyword": string, "count": number, "mode": "exact" | "fuzzy", "allow_nsfw": boolean }` searches the web and attempts to save the top results.
   - Acceptance: exact mode searches for the quoted phrase; fuzzy mode searches the unquoted keyword.
   - Acceptance: NSFW search results are not allowed by default.
-  - Acceptance: when `allow_nsfw` is true, the search request turns off the search provider safe-search hint for that run.
-  - Acceptance: the response reports imported, skipped, and failed URLs separately.
+  - Acceptance: when `allow_nsfw` is false, the server applies a local keyword-based NSFW filter to the search keyword, result title/URL, and fetched body text before saving.
+  - Acceptance: when `allow_nsfw` is true, the local NSFW filter is disabled and the search request turns off the search provider safe-search hint for that run.
+  - Acceptance: the response reports imported, skipped, filtered, and failed URLs separately.
 - Summarize saved article text locally.
   - Acceptance: `GET /api/articles/{id}` includes `generated_summary` when body text is available.
   - Acceptance: the article reader displays the generated summary above the article body.
@@ -134,7 +135,7 @@ Smoke checks:
 - `GET http://127.0.0.1:8765/api/articles/{id}` returns `generated_summary` for the sample article.
 - `GET http://127.0.0.1:8765/api/bookmarklet` returns a `javascript:` URL.
 - `POST http://127.0.0.1:8765/api/clip` without a key returns 403.
-- `POST http://127.0.0.1:8765/api/web-collect` with a small count and `allow_nsfw` set to `false` returns imported/skipped/failed arrays.
+- `POST http://127.0.0.1:8765/api/web-collect` with a small count and `allow_nsfw` set to `false` returns imported/skipped/filtered/failed arrays.
 - `git check-ignore -v data/articles.db __pycache__/server.cpython-314.pyc` confirms runtime files are ignored.
 - `python server.py --host 0.0.0.0 --port 8765` exits unless `--allow-remote` is passed.
 

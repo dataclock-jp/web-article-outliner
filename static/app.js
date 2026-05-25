@@ -447,6 +447,7 @@ function setWebCollectStatus(message, isError = false) {
 function renderWebCollectResults(payload) {
   const imported = payload.imported || [];
   const skipped = payload.skipped || [];
+  const filtered = payload.filtered || [];
   const failed = payload.failed || [];
   const rows = [];
 
@@ -455,6 +456,9 @@ function renderWebCollectResults(payload) {
   }
   for (const item of skipped) {
     rows.push(`<li><strong>Skipped</strong><span>${escapeHtml(item.title || item.url)} (${escapeHtml(item.reason || "")})</span></li>`);
+  }
+  for (const item of filtered) {
+    rows.push(`<li><strong>Filtered</strong><span>${escapeHtml(item.title || item.url || "Keyword")} (${escapeHtml(item.reason || "NSFW blocked")})</span></li>`);
   }
   for (const item of failed) {
     rows.push(`<li><strong>Failed</strong><span>${escapeHtml(item.title || item.url)}: ${escapeHtml(item.error || "")}</span></li>`);
@@ -487,8 +491,12 @@ async function collectFromWeb() {
     await loadArticles();
     const importedCount = (payload.imported || []).length;
     const skippedCount = (payload.skipped || []).length;
+    const filteredCount = (payload.filtered || []).length;
     const failedCount = (payload.failed || []).length;
-    setWebCollectStatus(`Saved ${importedCount}, skipped ${skippedCount}, failed ${failedCount}`, failedCount > 0 && importedCount === 0);
+    setWebCollectStatus(
+      `Saved ${importedCount}, skipped ${skippedCount}, filtered ${filteredCount}, failed ${failedCount}`,
+      failedCount > 0 && importedCount === 0 && filteredCount === 0,
+    );
   } catch (error) {
     setWebCollectStatus(error.message, true);
   } finally {

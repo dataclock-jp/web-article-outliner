@@ -33,7 +33,9 @@ The bookmarklet uses `POST /api/clip` and a locally generated `X-Article-Outline
 
 `POST /api/web-collect` fetches search results and result pages from the server. Keep the app local, collect only content you are allowed to save, and do not publish copied article databases unless you have redistribution rights.
 
-NSFW search results are not allowed by default. The `allow_nsfw` option only changes the search provider safe-search hint for that collection run; it is not a local content classifier and cannot guarantee that all unsafe content is blocked.
+NSFW search results are not allowed by default. When `allow_nsfw` is false, the app applies a local keyword-based filter to the search keyword, result title/URL, and fetched body text before saving. When `allow_nsfw` is true, that local filter is disabled for the collection run and the search provider safe-search hint is turned off.
+
+The local NSFW filter is a deterministic heuristic, not a full content classifier. It can reduce accidental imports, but it cannot guarantee that all unsafe content is blocked or that all safe content is allowed.
 
 ## Summaries
 
