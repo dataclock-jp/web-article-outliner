@@ -495,9 +495,11 @@ label span {
 
 .reader-head {
   align-items: flex-start;
+  min-width: 0;
 }
 
 .reader-title-block {
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -507,7 +509,7 @@ label span {
 
 .reader-title-block a {
   display: block;
-  max-width: 700px;
+  max-width: min(700px, 100%);
   margin-top: 4px;
   color: var(--blue);
   font-size: 0.86rem;
@@ -515,6 +517,11 @@ label span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.reader-head .toolbar {
+  flex: 0 0 auto;
+  max-width: 100%;
 }
 
 .summary-panel {
