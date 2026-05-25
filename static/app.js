@@ -28,6 +28,8 @@ const els = {
   saveStatus: document.querySelector("#saveStatus"),
   searchInput: document.querySelector("#searchInput"),
   searchMeta: document.querySelector("#searchMeta"),
+  summaryPanel: document.querySelector("#summaryPanel"),
+  summaryText: document.querySelector("#summaryText"),
   titleInput: document.querySelector("#titleInput"),
   toggleArticleButton: document.querySelector("#toggleArticleButton"),
   urlInput: document.querySelector("#urlInput"),
@@ -155,6 +157,7 @@ function startNewClip() {
   els.titleInput.value = "";
   els.urlInput.value = "";
   els.pasteSurface.innerHTML = "";
+  renderSummary("");
   els.editorPane.hidden = false;
   els.readerPane.hidden = true;
   setStatus("Ready");
@@ -242,8 +245,15 @@ async function openArticle(id) {
   }
   els.articleBody.classList.remove("is-hidden");
   els.toggleArticleButton.textContent = "Article";
+  renderSummary(article.generated_summary || "");
   renderArticle(article.html);
   renderArticleList();
+}
+
+function renderSummary(summary) {
+  const value = (summary || "").trim();
+  els.summaryText.textContent = value;
+  els.summaryPanel.hidden = !value;
 }
 
 function renderArticle(html) {

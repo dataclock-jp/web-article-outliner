@@ -16,6 +16,7 @@ Single personal user. The first version is optimized for private self-hosted use
 - Search saved article titles, source URLs, and stored body text, including articles that are not currently open.
 - Save the article currently open in another browser tab through a bookmarklet.
 - Enter a web collection keyword, choose strict or fuzzy search, and automatically save the top N result pages.
+- Open a saved article and read a local summary of roughly 1000 characters before the full article body.
 
 ## Functional Requirements And Acceptance Criteria
 
@@ -41,6 +42,10 @@ Single personal user. The first version is optimized for private self-hosted use
   - Acceptance: `POST /api/web-collect` with `{ "keyword": string, "count": number, "mode": "exact" | "fuzzy" }` searches the web and attempts to save the top results.
   - Acceptance: exact mode searches for the quoted phrase; fuzzy mode searches the unquoted keyword.
   - Acceptance: the response reports imported, skipped, and failed URLs separately.
+- Summarize saved article text locally.
+  - Acceptance: `GET /api/articles/{id}` includes `generated_summary` when body text is available.
+  - Acceptance: the article reader displays the generated summary above the article body.
+  - Acceptance: summary generation uses stored text locally and does not require an external AI API.
 - Keep the app dependency-light.
   - Acceptance: it runs with the Python standard library only.
 - Keep the repository publish-safe.
@@ -69,7 +74,7 @@ Single personal user. The first version is optimized for private self-hosted use
 - `GET /api/bookmarklet` returns JSON: `{ "bookmarklet": string, "label": string }`.
 - `POST /api/clip` accepts the same JSON as `/api/articles`, but requires `X-Article-Outliner-Key`.
 - `POST /api/web-collect` accepts JSON: `{ "keyword": string, "count": number, "mode": "exact" | "fuzzy" }`.
-- `GET /api/articles/{id}` returns one article JSON object.
+- `GET /api/articles/{id}` returns one article JSON object, including `generated_summary`.
 - `DELETE /api/articles/{id}` deletes one article.
 
 ## Constraints And Quality Bars
@@ -123,6 +128,7 @@ Smoke checks:
 - `POST http://127.0.0.1:8765/api/articles` stores a sample article.
 - `GET http://127.0.0.1:8765/api/articles` lists the sample article.
 - `GET http://127.0.0.1:8765/api/articles?q=<body-term>` finds the sample article by body text.
+- `GET http://127.0.0.1:8765/api/articles/{id}` returns `generated_summary` for the sample article.
 - `GET http://127.0.0.1:8765/api/bookmarklet` returns a `javascript:` URL.
 - `POST http://127.0.0.1:8765/api/clip` without a key returns 403.
 - `POST http://127.0.0.1:8765/api/web-collect` with a small count returns imported/skipped/failed arrays.

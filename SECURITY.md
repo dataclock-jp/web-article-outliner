@@ -33,6 +33,10 @@ The bookmarklet uses `POST /api/clip` and a locally generated `X-Article-Outline
 
 `POST /api/web-collect` fetches search results and result pages from the server. Keep the app local, collect only content you are allowed to save, and do not publish copied article databases unless you have redistribution rights.
 
+## Summaries
+
+Article summaries are generated locally from stored body text. No clipping content is sent to an external summarization service by this project.
+
 ## Private Data
 
 `data/` is ignored by git because article content may include personal browsing history, private URLs, copied copyrighted material, or sensitive text. Do not publish this directory.

@@ -27,12 +27,17 @@ Use `Web Collect` to enter a keyword, choose a search mode, and save the top res
 
 The server uses a lightweight web search page and then fetches each result URL. Some sites may block automated fetches or return content that cannot be imported; those entries are reported as failed while other results continue.
 
+## Summaries
+
+When you open a saved article, Article Outliner shows a local extractive summary of about 1000 characters. The summary is generated from the stored body text on your server and does not call an external AI service.
+
 ## MVP Scope
 
 - Paste rich HTML copied from a browser.
 - Save the currently open browser article with a bookmarklet.
 - Save top web search results for a keyword with strict or fuzzy search.
 - Save sanitized article HTML to server-side SQLite.
+- Show a local 1000-character article summary when opening a saved article.
 - List, search, open, and delete saved articles.
 - Search covers title, source URL, and stored body text across unopened articles.
 - Collapse or expand heading sections.

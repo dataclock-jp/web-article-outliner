@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import datetime as dt
 import html
 from html.parser import HTMLParser
@@ -26,8 +27,42 @@ CLIP_KEY_PATH = DATA_DIR / "clip_key.txt"
 MAX_REQUEST_BYTES = 15 * 1024 * 1024
 MAX_FETCH_BYTES = 5 * 1024 * 1024
 MAX_WEB_COLLECT_COUNT = 10
+SUMMARY_TARGET_CHARS = 1000
 HTTP_TIMEOUT_SECONDS = 15
 USER_AGENT = "ArticleOutliner/0.2 (+https://github.com/dataclock-jp/web-article-outliner)"
+SUMMARY_STOPWORDS = {
+    "about",
+    "after",
+    "also",
+    "and",
+    "are",
+    "because",
+    "but",
+    "can",
+    "for",
+    "from",
+    "has",
+    "have",
+    "into",
+    "its",
+    "more",
+    "not",
+    "that",
+    "the",
+    "this",
+    "was",
+    "were",
+    "with",
+    "する",
+    "ある",
+    "いる",
+    "こと",
+    "これ",
+    "ため",
+    "など",
+    "もの",
+    "よう",
+}
 
 
 def now_iso() -> str:
@@ -545,6 +580,116 @@ def make_snippet(text: str, query: str, width: int = 220) -> str:
     return f"{prefix}{text[start:end]}{suffix}"
 
 
+def normalize_plain_text(value: str) -> str:
+    return re.sub(r"\s+", " ", html.unescape(value or "")).strip()
+
+
+def smart_truncate(text: str, limit: int = SUMMARY_TARGET_CHARS) -> str:
+    text = normalize_plain_text(text)
+    if len(text) <= limit:
+        return text
+
+    cut = text[:limit].rstrip()
+    sentence_break = max(cut.rfind(mark) for mark in ("。", "．", ".", "!", "！", "?", "？"))
+    if sentence_break >= int(limit * 0.65):
+        return cut[: sentence_break + 1].strip()
+    return cut.rstrip("、,;；:： ") + "..."
+
+
+def split_summary_sentences(text: str) -> list[str]:
+    normalized = normalize_plain_text(text)
+    if not normalized:
+        return []
+    parts = re.split(r"(?<=[。．.!！?？])\s*", normalized)
+    return [part.strip() for part in parts if part.strip()]
+
+
+def summary_tokens(sentence: str) -> list[str]:
+    tokens: list[str] = []
+    for match in re.finditer(r"[a-z0-9][a-z0-9_-]{2,}|[ぁ-んァ-ヶー一-龯]{2,}", sentence.lower()):
+        value = match.group(0)
+        if re.fullmatch(r"[a-z0-9_-]+", value):
+            if value not in SUMMARY_STOPWORDS:
+                tokens.append(value)
+            continue
+
+        if len(value) <= 8:
+            if value not in SUMMARY_STOPWORDS:
+                tokens.append(value)
+            continue
+
+        tokens.extend(value[index : index + 2] for index in range(len(value) - 1))
+    return [token for token in tokens if token not in SUMMARY_STOPWORDS]
+
+
+def summary_sentence_key(sentence: str) -> str:
+    return re.sub(r"\W+", "", sentence.lower())[:180]
+
+
+def summarize_text(text: str, limit: int = SUMMARY_TARGET_CHARS) -> str:
+    normalized = normalize_plain_text(text)
+    if not normalized:
+        return ""
+    if len(normalized) <= limit:
+        return normalized
+
+    sentences = split_summary_sentences(normalized)
+    if len(sentences) <= 1:
+        return smart_truncate(normalized, limit)
+
+    tokenized = [summary_tokens(sentence) for sentence in sentences]
+    frequencies = Counter(token for tokens in tokenized for token in tokens)
+    if not frequencies:
+        return smart_truncate(" ".join(sentences), limit)
+
+    ranked: list[tuple[float, int]] = []
+    for index, (sentence, tokens) in enumerate(zip(sentences, tokenized)):
+        if len(sentence) < 14 and index != 0:
+            continue
+        token_score = sum(frequencies[token] for token in tokens) / max(len(tokens), 1)
+        position_score = 1.8 / (index + 1)
+        ranked.append((token_score + position_score, index))
+
+    selected = {0}
+    selected_keys = {summary_sentence_key(sentences[0])}
+    current_length = len(sentences[0])
+    for _score, index in sorted(ranked, reverse=True):
+        if index in selected:
+            continue
+        sentence = sentences[index]
+        sentence_key = summary_sentence_key(sentence)
+        if sentence_key and sentence_key in selected_keys:
+            continue
+        addition = len(sentence) + 1
+        if addition > int(limit * 0.7) and current_length > int(limit * 0.35):
+            continue
+        if current_length + addition > limit:
+            continue
+        selected.add(index)
+        selected_keys.add(sentence_key)
+        current_length += addition
+        if current_length >= int(limit * 0.82):
+            break
+
+    if current_length < int(limit * 0.55):
+        for index, sentence in enumerate(sentences):
+            if index in selected:
+                continue
+            sentence_key = summary_sentence_key(sentence)
+            if sentence_key and sentence_key in selected_keys:
+                continue
+            addition = len(sentence) + 1
+            if current_length + addition > limit:
+                break
+            selected.add(index)
+            selected_keys.add(sentence_key)
+            current_length += addition
+            if current_length >= int(limit * 0.85):
+                break
+
+    return smart_truncate(" ".join(sentences[index] for index in sorted(selected)), limit)
+
+
 def match_field(row: sqlite3.Row, query: str) -> str:
     if not query:
         return ""
@@ -573,6 +718,7 @@ def article_from_row(row: sqlite3.Row, include_html: bool = False, search_query:
     if include_html:
         item["html"] = row["html"]
         item["text_content"] = text
+        item["generated_summary"] = summarize_text(text)
     return item
 
 
