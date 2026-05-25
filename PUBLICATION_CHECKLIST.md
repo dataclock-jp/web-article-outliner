@@ -38,4 +38,4 @@ This app is intended for private personal clipping. Do not publish saved article
 
 ## License
 
-Choose and add a `LICENSE` file before describing the repository as open source or accepting external contributions.
+The repository includes an MIT `LICENSE`. Confirm that this is still the intended license before major releases.

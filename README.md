@@ -46,4 +46,4 @@ Only source files and documentation should be committed. Do not publish `data/`,
 
 ## License
 
-No open-source license has been selected yet. Add a `LICENSE` file before inviting reuse or contributions.
+MIT License. See `LICENSE`.
