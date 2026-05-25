@@ -25,6 +25,10 @@ Do not bind it to a public interface or deploy it on the open internet unless yo
 
 The server sanitizes saved HTML before storage. It removes scripts, event handlers, unsafe URLs, forms, iframes, embeds, SVG, canvas, audio, and video. Sanitization reduces risk, but saved clips should still be treated as untrusted content.
 
+## Bookmarklet Clip Endpoint
+
+The bookmarklet uses `POST /api/clip` and a locally generated `X-Article-Outliner-Key`. CORS is enabled only for this clip endpoint, not for the article-reading API. Treat the bookmarklet URL as private because it contains the local clip key.
+
 ## Private Data
 
 `data/` is ignored by git because article content may include personal browsing history, private URLs, copied copyrighted material, or sensitive text. Do not publish this directory.

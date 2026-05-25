@@ -12,9 +12,16 @@ python server.py --host 127.0.0.1 --port 8765
 
 Open `http://127.0.0.1:8765`.
 
+## Bookmarklet Clip
+
+Open Article Outliner, then drag the `Save to Article Outliner` bookmarklet to your browser bookmarks bar. When you are reading an article in another tab, click that bookmarklet to send the current page's article or main content to the local server.
+
+The bookmarklet posts to `/api/clip` with a locally generated clip key stored under `data/`. Other sites cannot use the clip endpoint without that key.
+
 ## MVP Scope
 
 - Paste rich HTML copied from a browser.
+- Save the currently open browser article with a bookmarklet.
 - Save sanitized article HTML to server-side SQLite.
 - List, search, open, and delete saved articles.
 - Search covers title, source URL, and stored body text across unopened articles.
@@ -26,6 +33,8 @@ Open `http://127.0.0.1:8765`.
 Articles are stored in `data/articles.db`.
 
 `data/` is ignored by git because saved article content may contain personal browsing history, copied third-party material, private URLs, and other sensitive text. Do not commit it.
+
+The local bookmarklet key is also stored under `data/` and must not be committed.
 
 ## Security Notes
 

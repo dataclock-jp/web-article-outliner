@@ -3,13 +3,17 @@ const state = {
   selectedId: null,
   pendingHtml: "",
   articleCollapsed: false,
+  bookmarklet: "",
   searchTimer: null,
 };
 
 const els = {
   articleList: document.querySelector("#articleList"),
   articleBody: document.querySelector("#articleBody"),
+  bookmarkletLink: document.querySelector("#bookmarkletLink"),
+  bookmarkletStatus: document.querySelector("#bookmarkletStatus"),
   collapseAllButton: document.querySelector("#collapseAllButton"),
+  copyBookmarkletButton: document.querySelector("#copyBookmarkletButton"),
   deleteButton: document.querySelector("#deleteButton"),
   editorPane: document.querySelector("#editorPane"),
   expandAllButton: document.querySelector("#expandAllButton"),
@@ -62,6 +66,22 @@ async function loadArticles() {
   const payload = await api(path);
   state.articles = payload.articles || [];
   renderArticleList();
+}
+
+async function loadBookmarklet() {
+  try {
+    const payload = await api("/api/bookmarklet");
+    state.bookmarklet = payload.bookmarklet || "";
+    els.bookmarkletLink.href = state.bookmarklet;
+    els.bookmarkletLink.textContent = payload.label || "Save to Article Outliner";
+    els.bookmarkletStatus.textContent = "Ready";
+    els.bookmarkletStatus.className = "toast";
+    els.copyBookmarkletButton.disabled = !state.bookmarklet;
+  } catch (error) {
+    els.bookmarkletStatus.textContent = error.message;
+    els.bookmarkletStatus.className = "error";
+    els.copyBookmarkletButton.disabled = true;
+  }
 }
 
 function renderArticleList() {
@@ -388,10 +408,25 @@ function toggleWholeArticle() {
   els.toggleArticleButton.textContent = state.articleCollapsed ? "Show" : "Article";
 }
 
+async function copyBookmarklet() {
+  if (!state.bookmarklet) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(state.bookmarklet);
+    els.bookmarkletStatus.textContent = "Copied";
+    els.bookmarkletStatus.className = "toast";
+  } catch (error) {
+    els.bookmarkletStatus.textContent = "Copy failed";
+    els.bookmarkletStatus.className = "error";
+  }
+}
+
 els.pasteSurface.addEventListener("paste", normalizePaste);
 els.saveButton.addEventListener("click", saveClip);
 els.newButton.addEventListener("click", startNewClip);
 els.refreshButton.addEventListener("click", loadArticles);
+els.copyBookmarkletButton.addEventListener("click", copyBookmarklet);
 els.searchInput.addEventListener("input", () => {
   window.clearTimeout(state.searchTimer);
   state.searchTimer = window.setTimeout(() => {
@@ -407,3 +442,4 @@ els.deleteButton.addEventListener("click", deleteCurrentArticle);
 els.toggleArticleButton.addEventListener("click", toggleWholeArticle);
 
 loadArticles().catch((error) => setStatus(error.message, true));
+loadBookmarklet();

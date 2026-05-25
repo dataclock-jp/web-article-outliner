@@ -14,6 +14,7 @@ Single personal user. The first version is optimized for private self-hosted use
 - Reopen saved articles from another browser session through the web app.
 - Collapse and expand the entire article or individual heading sections.
 - Search saved article titles, source URLs, and stored body text, including articles that are not currently open.
+- Save the article currently open in another browser tab through a bookmarklet.
 
 ## Functional Requirements And Acceptance Criteria
 
@@ -31,6 +32,10 @@ Single personal user. The first version is optimized for private self-hosted use
 - Search across saved body text.
   - Acceptance: `GET /api/articles?q=<term>` returns matches from title, source URL, or `text_content`.
   - Acceptance: search results include a body snippet when the match is found inside an unopened article.
+- Save the current browser article.
+  - Acceptance: `GET /api/bookmarklet` returns a bookmarklet URL that posts to the local app.
+  - Acceptance: `POST /api/clip` stores title, source URL, and HTML when `X-Article-Outliner-Key` matches the local clip key.
+  - Acceptance: `POST /api/clip` returns 403 when the clip key is missing or invalid.
 - Keep the app dependency-light.
   - Acceptance: it runs with the Python standard library only.
 - Keep the repository publish-safe.
@@ -42,7 +47,8 @@ Single personal user. The first version is optimized for private self-hosted use
 
 - No browser extension in the first version.
 - No multi-user accounts, synchronization, public sharing, or permission management.
-- No JavaScript execution from clipped pages.
+- No saved third-party page scripts are executed in the reader.
+- No automatic background monitoring of browser tabs.
 - No exact reproduction of interactive pages, ads, videos, login-only content, or site-specific dynamic behavior.
 - No changes to existing directories under `D:\CodexProject` except `D:\CodexProject\web-article-outliner`.
 
@@ -54,6 +60,8 @@ Single personal user. The first version is optimized for private self-hosted use
 - `GET /api/articles` returns a JSON list of saved articles.
 - `GET /api/articles?q=<term>` returns only articles matching title, source URL, or stored body text.
 - `POST /api/articles` accepts JSON: `{ "title": string, "source_url": string, "html": string }`.
+- `GET /api/bookmarklet` returns JSON: `{ "bookmarklet": string, "label": string }`.
+- `POST /api/clip` accepts the same JSON as `/api/articles`, but requires `X-Article-Outliner-Key`.
 - `GET /api/articles/{id}` returns one article JSON object.
 - `DELETE /api/articles/{id}` deletes one article.
 
@@ -108,6 +116,8 @@ Smoke checks:
 - `POST http://127.0.0.1:8765/api/articles` stores a sample article.
 - `GET http://127.0.0.1:8765/api/articles` lists the sample article.
 - `GET http://127.0.0.1:8765/api/articles?q=<body-term>` finds the sample article by body text.
+- `GET http://127.0.0.1:8765/api/bookmarklet` returns a `javascript:` URL.
+- `POST http://127.0.0.1:8765/api/clip` without a key returns 403.
 - `git check-ignore -v data/articles.db __pycache__/server.cpython-314.pyc` confirms runtime files are ignored.
 - `python server.py --host 0.0.0.0 --port 8765` exits unless `--allow-remote` is passed.
 

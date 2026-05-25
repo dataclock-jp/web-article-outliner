@@ -306,6 +306,52 @@ input:focus {
   gap: 12px;
 }
 
+.cliplet-panel {
+  margin: 14px 16px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8faf8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cliplet-panel span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.cliplet-panel strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.bookmarklet-link {
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--blue);
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.bookmarklet-link:hover {
+  background: var(--blue-dark);
+}
+
 label span {
   display: block;
   margin-bottom: 5px;
@@ -528,9 +574,15 @@ label span {
   }
 
   .field-grid,
+  .cliplet-panel,
   .pane-head {
     padding-left: 12px;
     padding-right: 12px;
+  }
+
+  .cliplet-panel {
+    align-items: stretch;
+    display: grid;
   }
 
   .paste-frame {

@@ -9,6 +9,7 @@ import mimetypes
 import os
 from pathlib import Path
 import re
+import secrets
 import sqlite3
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -19,6 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "articles.db"
+CLIP_KEY_PATH = DATA_DIR / "clip_key.txt"
 MAX_REQUEST_BYTES = 15 * 1024 * 1024
 
 
@@ -46,6 +48,20 @@ def connect_db() -> sqlite3.Connection:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_articles_updated ON articles(updated_at DESC)")
     conn.commit()
     return conn
+
+
+def get_clip_key() -> str:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        key = CLIP_KEY_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        key = ""
+    if key:
+        return key
+
+    key = secrets.token_urlsafe(32)
+    CLIP_KEY_PATH.write_text(key, encoding="utf-8")
+    return key
 
 
 class TextExtractor(HTMLParser):
@@ -408,6 +424,90 @@ def article_from_row(row: sqlite3.Row, include_html: bool = False, search_query:
     return item
 
 
+def create_article_record(payload: dict[str, Any]) -> dict[str, Any]:
+    raw_html = str(payload.get("html") or "")
+    if not raw_html.strip():
+        raise ValueError("HTML is required")
+
+    safe_html = sanitize_html(raw_html)
+    if not safe_html:
+        raise ValueError("No readable HTML remained after sanitizing")
+
+    title = clean_title(str(payload.get("title") or ""), safe_html)
+    source_url = str(payload.get("source_url") or "").strip()[:1000]
+    text = extract_text(safe_html)
+    timestamp = now_iso()
+
+    with connect_db() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO articles (title, source_url, html, text_content, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (title, source_url, safe_html, text, timestamp, timestamp),
+        )
+        article_id = int(cursor.lastrowid)
+        row = conn.execute(
+            "SELECT id, title, source_url, html, text_content, created_at, updated_at FROM articles WHERE id = ?",
+            (article_id,),
+        ).fetchone()
+        conn.commit()
+
+    return article_from_row(row, include_html=True)
+
+
+def bookmarklet_script(endpoint: str, clip_key: str) -> str:
+    script = f"""
+(async()=>{{
+  const endpoint={json.dumps(endpoint)};
+  const key={json.dumps(clip_key)};
+  const blocked='script,style,noscript,template,iframe,object,embed,form,input,button,textarea,select,option,svg,canvas,video,audio';
+  const status=(message,isError=false)=>{{
+    const id='article-outliner-clip-status';
+    let box=document.getElementById(id);
+    if(!box){{
+      box=document.createElement('div');
+      box.id=id;
+      box.style.cssText='position:fixed;z-index:2147483647;right:16px;bottom:16px;max-width:320px;padding:12px 14px;border-radius:8px;background:#1f2528;color:#fff;font:14px/1.4 system-ui,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.25)';
+      document.documentElement.appendChild(box);
+    }}
+    box.textContent=message;
+    box.style.background=isError?'#ad3f31':'#1f2528';
+    setTimeout(()=>box.remove(),4200);
+  }};
+  const absolutize=(root)=>{{
+    root.querySelectorAll('[href]').forEach((el)=>{{
+      const value=el.getAttribute('href');
+      if(value){{try{{el.setAttribute('href',new URL(value,location.href).href)}}catch(_err){{}}}}
+    }});
+    root.querySelectorAll('[src]').forEach((el)=>{{
+      const value=el.getAttribute('src');
+      if(value){{try{{el.setAttribute('src',new URL(value,location.href).href)}}catch(_err){{}}}}
+    }});
+    root.querySelectorAll('[srcset]').forEach((el)=>el.removeAttribute('srcset'));
+    root.querySelectorAll(blocked).forEach((el)=>el.remove());
+  }};
+  try{{
+    status('Saving to Article Outliner...');
+    const source=document.querySelector('article')||document.querySelector('main')||document.body;
+    const clone=source.cloneNode(true);
+    absolutize(clone);
+    const response=await fetch(endpoint,{{
+      method:'POST',
+      headers:{{'Content-Type':'application/json','X-Article-Outliner-Key':key}},
+      body:JSON.stringify({{title:document.title,source_url:location.href,html:clone.outerHTML}})
+    }});
+    if(!response.ok)throw new Error(await response.text());
+    status('Saved to Article Outliner');
+  }}catch(error){{
+    status('Article Outliner save failed: '+(error&&error.message?error.message:error),true);
+  }}
+}})()
+""".strip()
+    compact_script = re.sub(r"\s+", " ", script)
+    return f"javascript:{compact_script}"
+
+
 class AppHandler(BaseHTTPRequestHandler):
     server_version = "ArticleOutliner/0.1"
 
@@ -429,6 +529,9 @@ class AppHandler(BaseHTTPRequestHandler):
             query = parse_qs(parsed.query).get("q", [""])[0]
             self.list_articles(query)
             return
+        if path == "/api/bookmarklet":
+            self.get_bookmarklet()
+            return
         match = re.fullmatch(r"/api/articles/(\d+)", path)
         if match:
             self.get_article(int(match.group(1)))
@@ -440,6 +543,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/articles":
             self.create_article()
             return
+        if path == "/api/clip":
+            self.create_clip()
+            return
         self.respond_error(404, "Not found")
 
     def do_DELETE(self) -> None:
@@ -450,6 +556,12 @@ class AppHandler(BaseHTTPRequestHandler):
         self.respond_error(404, "Not found")
 
     def do_OPTIONS(self) -> None:
+        if urlparse(self.path).path == "/api/clip":
+            self.send_response(204)
+            self.send_common_headers("text/plain; charset=utf-8")
+            self.send_clip_cors_headers()
+            self.end_headers()
+            return
         self.send_response(204)
         self.send_common_headers("text/plain; charset=utf-8")
         self.end_headers()
@@ -507,6 +619,16 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         self.respond_json({"article": article_from_row(row, include_html=True)})
 
+    def get_bookmarklet(self) -> None:
+        host = self.headers.get("Host", "127.0.0.1:8765")
+        endpoint = f"http://{host}/api/clip"
+        self.respond_json(
+            {
+                "label": "Save to Article Outliner",
+                "bookmarklet": bookmarklet_script(endpoint, get_clip_key()),
+            }
+        )
+
     def create_article(self) -> None:
         try:
             payload = self.read_json()
@@ -514,37 +636,27 @@ class AppHandler(BaseHTTPRequestHandler):
             self.respond_error(400, str(exc))
             return
 
-        raw_html = str(payload.get("html") or "")
-        if not raw_html.strip():
-            self.respond_error(400, "HTML is required")
+        try:
+            article = create_article_record(payload)
+        except ValueError as exc:
+            self.respond_error(400, str(exc))
             return
 
-        safe_html = sanitize_html(raw_html)
-        if not safe_html:
-            self.respond_error(400, "No readable HTML remained after sanitizing")
+        self.respond_json({"article": article}, status=201)
+
+    def create_clip(self) -> None:
+        if self.headers.get("X-Article-Outliner-Key", "") != get_clip_key():
+            self.respond_error(403, "Invalid clip key", cors=True)
             return
 
-        title = clean_title(str(payload.get("title") or ""), safe_html)
-        source_url = str(payload.get("source_url") or "").strip()[:1000]
-        text = extract_text(safe_html)
-        timestamp = now_iso()
+        try:
+            payload = self.read_json()
+            article = create_article_record(payload)
+        except ValueError as exc:
+            self.respond_error(400, str(exc), cors=True)
+            return
 
-        with connect_db() as conn:
-            cursor = conn.execute(
-                """
-                INSERT INTO articles (title, source_url, html, text_content, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (title, source_url, safe_html, text, timestamp, timestamp),
-            )
-            article_id = int(cursor.lastrowid)
-            row = conn.execute(
-                "SELECT id, title, source_url, html, text_content, created_at, updated_at FROM articles WHERE id = ?",
-                (article_id,),
-            ).fetchone()
-            conn.commit()
-
-        self.respond_json({"article": article_from_row(row, include_html=True)}, status=201)
+        self.respond_json({"article": article}, status=201, cors=True)
 
     def delete_article(self, article_id: int) -> None:
         with connect_db() as conn:
@@ -570,16 +682,18 @@ class AppHandler(BaseHTTPRequestHandler):
             raise ValueError("Request body must be a JSON object")
         return payload
 
-    def respond_json(self, payload: dict[str, Any], status: int = 200) -> None:
+    def respond_json(self, payload: dict[str, Any], status: int = 200, cors: bool = False) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_common_headers("application/json; charset=utf-8")
+        if cors:
+            self.send_clip_cors_headers()
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
-    def respond_error(self, status: int, message: str) -> None:
-        self.respond_json({"error": message}, status=status)
+    def respond_error(self, status: int, message: str, cors: bool = False) -> None:
+        self.respond_json({"error": message}, status=status, cors=cors)
 
     def send_common_headers(self, content_type: str) -> None:
         self.send_header("Content-Type", content_type)
@@ -590,6 +704,15 @@ class AppHandler(BaseHTTPRequestHandler):
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
         )
+
+    def send_clip_cors_headers(self) -> None:
+        origin = self.headers.get("Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Article-Outliner-Key")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
 
     def log_message(self, fmt: str, *args: Any) -> None:
         timestamp = dt.datetime.now().strftime("%H:%M:%S")

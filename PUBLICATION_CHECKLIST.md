@@ -20,6 +20,7 @@ Expected result:
 
 - `data/`
 - `__pycache__/`
+- `data/clip_key.txt`
 - `.env`
 - `.env.*`
 - `*.log`
