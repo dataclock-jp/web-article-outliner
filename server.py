@@ -481,11 +481,12 @@ def normalize_search_url(href: str) -> str:
     return href
 
 
-def search_web(keyword: str, mode: str, count: int) -> list[dict[str, str]]:
+def search_web(keyword: str, mode: str, count: int, allow_nsfw: bool = False) -> list[dict[str, str]]:
     query = f'"{keyword}"' if mode == "exact" else keyword
+    search_params = {"q": query, "kp": "-2" if allow_nsfw else "1"}
     urls = [
-        "https://duckduckgo.com/html/?" + urlencode({"q": query}),
-        "https://lite.duckduckgo.com/lite/?" + urlencode({"q": query}),
+        "https://duckduckgo.com/html/?" + urlencode(search_params),
+        "https://lite.duckduckgo.com/lite/?" + urlencode(search_params),
     ]
     seen: set[str] = set()
     results: list[dict[str, str]] = []
@@ -765,7 +766,17 @@ def find_article_by_source_url(source_url: str) -> dict[str, Any] | None:
     return article_from_row(row)
 
 
-def collect_web_articles(keyword: str, mode: str, count: int) -> dict[str, Any]:
+def parse_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on", "allow", "allowed"}
+    return False
+
+
+def collect_web_articles(keyword: str, mode: str, count: int, allow_nsfw: bool = False) -> dict[str, Any]:
     keyword = re.sub(r"\s+", " ", keyword or "").strip()
     if not keyword:
         raise ValueError("Keyword is required")
@@ -774,7 +785,7 @@ def collect_web_articles(keyword: str, mode: str, count: int) -> dict[str, Any]:
     if count < 1 or count > MAX_WEB_COLLECT_COUNT:
         raise ValueError(f"Count must be between 1 and {MAX_WEB_COLLECT_COUNT}")
 
-    results = search_web(keyword, mode, count)
+    results = search_web(keyword, mode, count, allow_nsfw=allow_nsfw)
     imported: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     failed: list[dict[str, str]] = []
@@ -798,6 +809,7 @@ def collect_web_articles(keyword: str, mode: str, count: int) -> dict[str, Any]:
     return {
         "keyword": keyword,
         "mode": mode,
+        "allow_nsfw": allow_nsfw,
         "requested_count": count,
         "search_results": results,
         "imported": imported,
@@ -1017,7 +1029,8 @@ class AppHandler(BaseHTTPRequestHandler):
             keyword = str(payload.get("keyword") or "")
             mode = str(payload.get("mode") or "exact")
             count = int(payload.get("count") or 3)
-            result = collect_web_articles(keyword, mode, count)
+            allow_nsfw = parse_bool(payload.get("allow_nsfw", False))
+            result = collect_web_articles(keyword, mode, count, allow_nsfw=allow_nsfw)
         except ValueError as exc:
             self.respond_error(400, str(exc))
             return

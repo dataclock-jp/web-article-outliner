@@ -24,8 +24,9 @@ Use `Web Collect` to enter a keyword, choose a search mode, and save the top res
 
 - `厳密`: searches the quoted phrase.
 - `あいまい`: searches the unquoted keyword.
+- `NSFWを許可`: turns off the search provider safe-search hint for that collection run. It is off by default.
 
-The server uses a lightweight web search page and then fetches each result URL. Some sites may block automated fetches or return content that cannot be imported; those entries are reported as failed while other results continue.
+The server uses a lightweight web search page and then fetches each result URL. Some sites may block automated fetches or return content that cannot be imported; those entries are reported as failed while other results continue. The NSFW setting is best-effort because it depends on the search provider's filtering.
 
 ## Summaries
 
@@ -35,7 +36,7 @@ When you open a saved article, Article Outliner shows a local extractive summary
 
 - Paste rich HTML copied from a browser.
 - Save the currently open browser article with a bookmarklet.
-- Save top web search results for a keyword with strict or fuzzy search.
+- Save top web search results for a keyword with strict or fuzzy search and an optional NSFW allowance.
 - Save sanitized article HTML to server-side SQLite.
 - Show a local 1000-character article summary when opening a saved article.
 - List, search, open, and delete saved articles.

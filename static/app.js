@@ -39,6 +39,7 @@ const els = {
   webCountInput: document.querySelector("#webCountInput"),
   webKeywordInput: document.querySelector("#webKeywordInput"),
   webModeSelect: document.querySelector("#webModeSelect"),
+  webNsfwInput: document.querySelector("#webNsfwInput"),
 };
 
 function setStatus(message, isError = false) {
@@ -466,6 +467,7 @@ async function collectFromWeb() {
   const keyword = els.webKeywordInput.value.trim();
   const count = Math.max(1, Math.min(10, Number.parseInt(els.webCountInput.value, 10) || 3));
   const mode = els.webModeSelect.value === "fuzzy" ? "fuzzy" : "exact";
+  const allowNsfw = els.webNsfwInput.checked;
 
   if (!keyword) {
     setWebCollectStatus("Keyword required", true);
@@ -479,7 +481,7 @@ async function collectFromWeb() {
   try {
     const payload = await api("/api/web-collect", {
       method: "POST",
-      body: JSON.stringify({ keyword, count, mode }),
+      body: JSON.stringify({ keyword, count, mode, allow_nsfw: allowNsfw }),
     });
     renderWebCollectResults(payload);
     await loadArticles();
