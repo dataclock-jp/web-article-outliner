@@ -21,14 +21,24 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
+html {
+  height: 100%;
+}
+
 body {
   margin: 0;
+  height: 100%;
   min-height: 100vh;
   background:
     linear-gradient(90deg, rgba(28, 99, 147, 0.05) 1px, transparent 1px),
     linear-gradient(180deg, #f8f9f6 0%, var(--bg) 100%);
   background-size: 56px 56px, auto;
   color: var(--ink);
+  overflow: hidden;
 }
 
 button,
@@ -49,11 +59,15 @@ button:disabled {
 
 .app-shell {
   width: min(1420px, calc(100vw - 32px));
+  height: 100dvh;
   margin: 0 auto;
-  padding: 20px 0 28px;
+  padding: 20px 0 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .topbar {
+  flex: 0 0 auto;
   min-height: 54px;
   display: flex;
   align-items: center;
@@ -160,10 +174,12 @@ p {
 }
 
 .workspace {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   grid-template-columns: clamp(250px, 24vw, 310px) minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .sidebar,
@@ -176,10 +192,12 @@ p {
 }
 
 .sidebar {
-  min-height: calc(100dvh - 90px);
+  min-height: 0;
+  height: 100%;
   padding: 12px;
-  position: sticky;
-  top: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .search-row {
@@ -213,8 +231,12 @@ select:focus {
 }
 
 .article-list {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
+  align-content: start;
   gap: 8px;
+  overflow: auto;
 }
 
 .article-item {
@@ -282,12 +304,17 @@ select:focus {
 
 .editor-pane,
 .reader-pane {
-  min-height: calc(100dvh - 90px);
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
 .reader-pane:not([hidden]) {
-  height: calc(100dvh - 90px);
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-pane {
   display: flex;
   flex-direction: column;
 }
@@ -469,11 +496,15 @@ label span {
 }
 
 .paste-frame {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 14px 16px 16px;
+  display: flex;
 }
 
 .paste-surface {
-  min-height: calc(100vh - 270px);
+  flex: 1 1 auto;
+  min-height: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
@@ -699,18 +730,9 @@ label span {
   }
 
   .sidebar {
-    min-height: calc(100dvh - 82px);
+    min-height: 0;
+    height: 100%;
     padding: 8px;
-    top: 8px;
-  }
-
-  .editor-pane,
-  .reader-pane {
-    min-height: calc(100dvh - 82px);
-  }
-
-  .reader-pane:not([hidden]) {
-    height: calc(100dvh - 82px);
   }
 
   .article-item {
@@ -781,7 +803,7 @@ label span {
   }
 
   .paste-surface {
-    min-height: 420px;
+    min-height: 0;
     padding: 14px;
   }
 }
