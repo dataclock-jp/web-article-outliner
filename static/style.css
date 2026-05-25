@@ -161,7 +161,7 @@ p {
 
 .workspace {
   display: grid;
-  grid-template-columns: 310px minmax(0, 1fr);
+  grid-template-columns: clamp(250px, 24vw, 310px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -654,19 +654,6 @@ label span {
 }
 
 @media (max-width: 960px) {
-  .workspace {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    position: static;
-    min-height: auto;
-  }
-
-  .article-list {
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  }
-
   .field-grid,
   .reader-layout {
     grid-template-columns: 1fr;
@@ -692,6 +679,51 @@ label span {
 
   .article-body {
     max-height: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .workspace {
+    grid-template-columns: minmax(140px, 40vw) minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .sidebar {
+    min-height: calc(100vh - 94px);
+    padding: 8px;
+    top: 8px;
+  }
+
+  .article-item {
+    min-height: 64px;
+    padding: 8px;
+  }
+
+  .article-item .snippet {
+    display: none;
+  }
+
+  .cliplet-panel,
+  .web-collect-panel {
+    margin-left: 8px;
+    margin-right: 8px;
+    padding: 8px;
+  }
+
+  .cliplet-panel .toolbar,
+  .web-collect-head {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .bookmarklet-link {
+    width: 100%;
+    min-width: 0;
+    min-height: 34px;
+    padding: 7px 8px;
+    text-align: center;
+    white-space: normal;
   }
 }
 
