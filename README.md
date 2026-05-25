@@ -18,10 +18,20 @@ Open Article Outliner, then drag the `Save to Article Outliner` bookmarklet to y
 
 The bookmarklet posts to `/api/clip` with a locally generated clip key stored under `data/`. Other sites cannot use the clip endpoint without that key.
 
+## Web Collect
+
+Use `Web Collect` to enter a keyword, choose a search mode, and save the top result pages.
+
+- `厳密`: searches the quoted phrase.
+- `あいまい`: searches the unquoted keyword.
+
+The server uses a lightweight web search page and then fetches each result URL. Some sites may block automated fetches or return content that cannot be imported; those entries are reported as failed while other results continue.
+
 ## MVP Scope
 
 - Paste rich HTML copied from a browser.
 - Save the currently open browser article with a bookmarklet.
+- Save top web search results for a keyword with strict or fuzzy search.
 - Save sanitized article HTML to server-side SQLite.
 - List, search, open, and delete saved articles.
 - Search covers title, source URL, and stored body text across unopened articles.

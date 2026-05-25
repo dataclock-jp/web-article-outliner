@@ -31,6 +31,12 @@ const els = {
   titleInput: document.querySelector("#titleInput"),
   toggleArticleButton: document.querySelector("#toggleArticleButton"),
   urlInput: document.querySelector("#urlInput"),
+  webCollectButton: document.querySelector("#webCollectButton"),
+  webCollectResults: document.querySelector("#webCollectResults"),
+  webCollectStatus: document.querySelector("#webCollectStatus"),
+  webCountInput: document.querySelector("#webCountInput"),
+  webKeywordInput: document.querySelector("#webKeywordInput"),
+  webModeSelect: document.querySelector("#webModeSelect"),
 };
 
 function setStatus(message, isError = false) {
@@ -422,11 +428,74 @@ async function copyBookmarklet() {
   }
 }
 
+function setWebCollectStatus(message, isError = false) {
+  els.webCollectStatus.textContent = message;
+  els.webCollectStatus.className = isError ? "error" : "toast";
+}
+
+function renderWebCollectResults(payload) {
+  const imported = payload.imported || [];
+  const skipped = payload.skipped || [];
+  const failed = payload.failed || [];
+  const rows = [];
+
+  for (const item of imported) {
+    rows.push(`<li><strong>Saved</strong><span>${escapeHtml(item.title || item.source_url)}</span></li>`);
+  }
+  for (const item of skipped) {
+    rows.push(`<li><strong>Skipped</strong><span>${escapeHtml(item.title || item.url)} (${escapeHtml(item.reason || "")})</span></li>`);
+  }
+  for (const item of failed) {
+    rows.push(`<li><strong>Failed</strong><span>${escapeHtml(item.title || item.url)}: ${escapeHtml(item.error || "")}</span></li>`);
+  }
+
+  els.webCollectResults.innerHTML = rows.length ? `<ul>${rows.join("")}</ul>` : "";
+}
+
+async function collectFromWeb() {
+  const keyword = els.webKeywordInput.value.trim();
+  const count = Math.max(1, Math.min(10, Number.parseInt(els.webCountInput.value, 10) || 3));
+  const mode = els.webModeSelect.value === "fuzzy" ? "fuzzy" : "exact";
+
+  if (!keyword) {
+    setWebCollectStatus("Keyword required", true);
+    els.webKeywordInput.focus();
+    return;
+  }
+
+  els.webCollectButton.disabled = true;
+  setWebCollectStatus("Collecting");
+  els.webCollectResults.innerHTML = "";
+  try {
+    const payload = await api("/api/web-collect", {
+      method: "POST",
+      body: JSON.stringify({ keyword, count, mode }),
+    });
+    renderWebCollectResults(payload);
+    await loadArticles();
+    const importedCount = (payload.imported || []).length;
+    const skippedCount = (payload.skipped || []).length;
+    const failedCount = (payload.failed || []).length;
+    setWebCollectStatus(`Saved ${importedCount}, skipped ${skippedCount}, failed ${failedCount}`, failedCount > 0 && importedCount === 0);
+  } catch (error) {
+    setWebCollectStatus(error.message, true);
+  } finally {
+    els.webCollectButton.disabled = false;
+  }
+}
+
 els.pasteSurface.addEventListener("paste", normalizePaste);
 els.saveButton.addEventListener("click", saveClip);
 els.newButton.addEventListener("click", startNewClip);
 els.refreshButton.addEventListener("click", loadArticles);
 els.copyBookmarkletButton.addEventListener("click", copyBookmarklet);
+els.webCollectButton.addEventListener("click", collectFromWeb);
+els.webKeywordInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    collectFromWeb();
+  }
+});
 els.searchInput.addEventListener("input", () => {
   window.clearTimeout(state.searchTimer);
   state.searchTimer = window.setTimeout(() => {

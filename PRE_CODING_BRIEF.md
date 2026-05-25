@@ -15,6 +15,7 @@ Single personal user. The first version is optimized for private self-hosted use
 - Collapse and expand the entire article or individual heading sections.
 - Search saved article titles, source URLs, and stored body text, including articles that are not currently open.
 - Save the article currently open in another browser tab through a bookmarklet.
+- Enter a web collection keyword, choose strict or fuzzy search, and automatically save the top N result pages.
 
 ## Functional Requirements And Acceptance Criteria
 
@@ -36,6 +37,10 @@ Single personal user. The first version is optimized for private self-hosted use
   - Acceptance: `GET /api/bookmarklet` returns a bookmarklet URL that posts to the local app.
   - Acceptance: `POST /api/clip` stores title, source URL, and HTML when `X-Article-Outliner-Key` matches the local clip key.
   - Acceptance: `POST /api/clip` returns 403 when the clip key is missing or invalid.
+- Collect pages from web search.
+  - Acceptance: `POST /api/web-collect` with `{ "keyword": string, "count": number, "mode": "exact" | "fuzzy" }` searches the web and attempts to save the top results.
+  - Acceptance: exact mode searches for the quoted phrase; fuzzy mode searches the unquoted keyword.
+  - Acceptance: the response reports imported, skipped, and failed URLs separately.
 - Keep the app dependency-light.
   - Acceptance: it runs with the Python standard library only.
 - Keep the repository publish-safe.
@@ -49,6 +54,7 @@ Single personal user. The first version is optimized for private self-hosted use
 - No multi-user accounts, synchronization, public sharing, or permission management.
 - No saved third-party page scripts are executed in the reader.
 - No automatic background monitoring of browser tabs.
+- No guarantee that every search result can be fetched; pages may block automated access or return unsupported content.
 - No exact reproduction of interactive pages, ads, videos, login-only content, or site-specific dynamic behavior.
 - No changes to existing directories under `D:\CodexProject` except `D:\CodexProject\web-article-outliner`.
 
@@ -62,6 +68,7 @@ Single personal user. The first version is optimized for private self-hosted use
 - `POST /api/articles` accepts JSON: `{ "title": string, "source_url": string, "html": string }`.
 - `GET /api/bookmarklet` returns JSON: `{ "bookmarklet": string, "label": string }`.
 - `POST /api/clip` accepts the same JSON as `/api/articles`, but requires `X-Article-Outliner-Key`.
+- `POST /api/web-collect` accepts JSON: `{ "keyword": string, "count": number, "mode": "exact" | "fuzzy" }`.
 - `GET /api/articles/{id}` returns one article JSON object.
 - `DELETE /api/articles/{id}` deletes one article.
 
@@ -118,6 +125,7 @@ Smoke checks:
 - `GET http://127.0.0.1:8765/api/articles?q=<body-term>` finds the sample article by body text.
 - `GET http://127.0.0.1:8765/api/bookmarklet` returns a `javascript:` URL.
 - `POST http://127.0.0.1:8765/api/clip` without a key returns 403.
+- `POST http://127.0.0.1:8765/api/web-collect` with a small count returns imported/skipped/failed arrays.
 - `git check-ignore -v data/articles.db __pycache__/server.cpython-314.pyc` confirms runtime files are ignored.
 - `python server.py --host 0.0.0.0 --port 8765` exits unless `--allow-remote` is passed.
 

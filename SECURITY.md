@@ -29,6 +29,10 @@ The server sanitizes saved HTML before storage. It removes scripts, event handle
 
 The bookmarklet uses `POST /api/clip` and a locally generated `X-Article-Outliner-Key`. CORS is enabled only for this clip endpoint, not for the article-reading API. Treat the bookmarklet URL as private because it contains the local clip key.
 
+## Web Collection
+
+`POST /api/web-collect` fetches search results and result pages from the server. Keep the app local, collect only content you are allowed to save, and do not publish copied article databases unless you have redistribution rights.
+
 ## Private Data
 
 `data/` is ignored by git because article content may include personal browsing history, private URLs, copied copyrighted material, or sensitive text. Do not publish this directory.

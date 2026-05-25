@@ -7,7 +7,7 @@ Use this checklist before pushing the repository to a public host.
 ```powershell
 python -m py_compile server.py
 git status --short --ignored
-git check-ignore -v data/articles.db __pycache__/server.cpython-314.pyc
+git check-ignore -v data/articles.db data/clip_key.txt __pycache__/server.cpython-314.pyc
 ```
 
 Expected result:

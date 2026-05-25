@@ -12,7 +12,9 @@ import re
 import secrets
 import sqlite3
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib import error as urlerror
+from urllib import request as urlrequest
+from urllib.parse import parse_qs, urlencode, unquote, urljoin, urlparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -22,6 +24,10 @@ DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "articles.db"
 CLIP_KEY_PATH = DATA_DIR / "clip_key.txt"
 MAX_REQUEST_BYTES = 15 * 1024 * 1024
+MAX_FETCH_BYTES = 5 * 1024 * 1024
+MAX_WEB_COLLECT_COUNT = 10
+HTTP_TIMEOUT_SECONDS = 15
+USER_AGENT = "ArticleOutliner/0.2 (+https://github.com/dataclock-jp/web-article-outliner)"
 
 
 def now_iso() -> str:
@@ -86,6 +92,44 @@ class TextExtractor(HTMLParser):
 
     def text(self) -> str:
         return re.sub(r"\s+", " ", " ".join(self.parts)).strip()
+
+
+class SearchResultParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.results: list[dict[str, str]] = []
+        self._current_href = ""
+        self._current_text: list[str] = []
+        self._collecting = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() != "a":
+            return
+        attrs_dict = {name.lower(): value or "" for name, value in attrs}
+        href = attrs_dict.get("href", "")
+        class_name = attrs_dict.get("class", "")
+        if not href:
+            return
+        if "result__a" not in class_name and "uddg=" not in href and not href.startswith(("http://", "https://")):
+            return
+        self._current_href = href
+        self._current_text = []
+        self._collecting = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() != "a" or not self._collecting:
+            return
+        url = normalize_search_url(self._current_href)
+        title = re.sub(r"\s+", " ", " ".join(self._current_text)).strip()
+        if url and title:
+            self.results.append({"title": title[:180], "url": url})
+        self._current_href = ""
+        self._current_text = []
+        self._collecting = False
+
+    def handle_data(self, data: str) -> None:
+        if self._collecting:
+            self._current_text.append(data)
 
 
 class HtmlSanitizer(HTMLParser):
@@ -356,6 +400,114 @@ def extract_text(raw_html: str) -> str:
     return parser.text()
 
 
+def http_get_text(url: str, timeout: int = HTTP_TIMEOUT_SECONDS) -> str:
+    request = urlrequest.Request(
+        url,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "ja,en-US;q=0.8,en;q=0.6",
+        },
+    )
+    try:
+        with urlrequest.urlopen(request, timeout=timeout) as response:
+            content_type = response.headers.get("Content-Type", "")
+            raw = response.read(MAX_FETCH_BYTES + 1)
+    except urlerror.URLError as exc:
+        raise RuntimeError(f"Fetch failed: {exc}") from exc
+
+    if len(raw) > MAX_FETCH_BYTES:
+        raise RuntimeError("Response was too large")
+
+    charset_match = re.search(r"charset=([\w.-]+)", content_type, flags=re.IGNORECASE)
+    charset = charset_match.group(1) if charset_match else "utf-8"
+    try:
+        return raw.decode(charset, errors="replace")
+    except LookupError:
+        return raw.decode("utf-8", errors="replace")
+
+
+def normalize_search_url(href: str) -> str:
+    if href.startswith("//"):
+        href = f"https:{href}"
+    elif href.startswith("/"):
+        href = urljoin("https://duckduckgo.com", href)
+
+    parsed = urlparse(href)
+    query = parse_qs(parsed.query)
+    if "uddg" in query and query["uddg"]:
+        href = unquote(query["uddg"][0])
+        parsed = urlparse(href)
+
+    if parsed.scheme not in {"http", "https"}:
+        return ""
+    if parsed.netloc.endswith("duckduckgo.com"):
+        return ""
+    return href
+
+
+def search_web(keyword: str, mode: str, count: int) -> list[dict[str, str]]:
+    query = f'"{keyword}"' if mode == "exact" else keyword
+    urls = [
+        "https://duckduckgo.com/html/?" + urlencode({"q": query}),
+        "https://lite.duckduckgo.com/lite/?" + urlencode({"q": query}),
+    ]
+    seen: set[str] = set()
+    results: list[dict[str, str]] = []
+    errors: list[str] = []
+
+    for search_url in urls:
+        try:
+            page = http_get_text(search_url)
+        except RuntimeError as exc:
+            errors.append(str(exc))
+            continue
+
+        parser = SearchResultParser()
+        parser.feed(page)
+        for result in parser.results:
+            url = result["url"]
+            if url in seen:
+                continue
+            seen.add(url)
+            results.append(result)
+            if len(results) >= count:
+                return results
+
+    if not results and errors:
+        raise RuntimeError("; ".join(errors))
+    return results[:count]
+
+
+def extract_page_title(raw_html: str) -> str:
+    match = re.search(r"<title[^>]*>(.*?)</title>", raw_html, flags=re.IGNORECASE | re.DOTALL)
+    if not match:
+        return ""
+    return extract_text(match.group(1))[:180]
+
+
+def extract_readable_html(raw_html: str, base_url: str) -> str:
+    for tag in ("article", "main", "body"):
+        matches = re.findall(rf"<{tag}\b[^>]*>.*?</{tag}>", raw_html, flags=re.IGNORECASE | re.DOTALL)
+        if matches:
+            return absolutize_html(max(matches, key=len), base_url)
+    return absolutize_html(raw_html, base_url)
+
+
+def absolutize_html(raw_html: str, base_url: str) -> str:
+    raw_html = re.sub(r"\s+srcset=(['\"]).*?\1", "", raw_html, flags=re.IGNORECASE | re.DOTALL)
+
+    def replace_attr(match: re.Match[str]) -> str:
+        name = match.group(1)
+        quote = match.group(2)
+        value = html.unescape(match.group(3)).strip()
+        if not value or value.startswith(("#", "data:", "mailto:", "tel:", "javascript:")):
+            return match.group(0)
+        return f'{name}={quote}{html.escape(urljoin(base_url, value), quote=True)}{quote}'
+
+    return re.sub(r"\b(href|src)=(['\"])(.*?)\2", replace_attr, raw_html, flags=re.IGNORECASE | re.DOTALL)
+
+
 def clean_title(value: str, fallback_html: str) -> str:
     title = re.sub(r"\s+", " ", value or "").strip()
     if title:
@@ -456,6 +608,58 @@ def create_article_record(payload: dict[str, Any]) -> dict[str, Any]:
     return article_from_row(row, include_html=True)
 
 
+def find_article_by_source_url(source_url: str) -> dict[str, Any] | None:
+    with connect_db() as conn:
+        row = conn.execute(
+            "SELECT id, title, source_url, html, text_content, created_at, updated_at FROM articles WHERE source_url = ?",
+            (source_url,),
+        ).fetchone()
+    if row is None:
+        return None
+    return article_from_row(row)
+
+
+def collect_web_articles(keyword: str, mode: str, count: int) -> dict[str, Any]:
+    keyword = re.sub(r"\s+", " ", keyword or "").strip()
+    if not keyword:
+        raise ValueError("Keyword is required")
+    if mode not in {"exact", "fuzzy"}:
+        raise ValueError("Search mode must be exact or fuzzy")
+    if count < 1 or count > MAX_WEB_COLLECT_COUNT:
+        raise ValueError(f"Count must be between 1 and {MAX_WEB_COLLECT_COUNT}")
+
+    results = search_web(keyword, mode, count)
+    imported: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    failed: list[dict[str, str]] = []
+
+    for result in results:
+        url = result["url"]
+        existing = find_article_by_source_url(url)
+        if existing is not None:
+            skipped.append({"url": url, "title": existing["title"], "reason": "already saved", "id": existing["id"]})
+            continue
+
+        try:
+            page_html = http_get_text(url)
+            readable_html = extract_readable_html(page_html, url)
+            title = extract_page_title(page_html) or result["title"]
+            article = create_article_record({"title": title, "source_url": url, "html": readable_html})
+            imported.append({key: article[key] for key in ("id", "title", "source_url", "summary")})
+        except Exception as exc:
+            failed.append({"url": url, "title": result["title"], "error": str(exc)})
+
+    return {
+        "keyword": keyword,
+        "mode": mode,
+        "requested_count": count,
+        "search_results": results,
+        "imported": imported,
+        "skipped": skipped,
+        "failed": failed,
+    }
+
+
 def bookmarklet_script(endpoint: str, clip_key: str) -> str:
     script = f"""
 (async()=>{{
@@ -545,6 +749,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/clip":
             self.create_clip()
+            return
+        if path == "/api/web-collect":
+            self.collect_from_web()
             return
         self.respond_error(404, "Not found")
 
@@ -657,6 +864,22 @@ class AppHandler(BaseHTTPRequestHandler):
             return
 
         self.respond_json({"article": article}, status=201, cors=True)
+
+    def collect_from_web(self) -> None:
+        try:
+            payload = self.read_json()
+            keyword = str(payload.get("keyword") or "")
+            mode = str(payload.get("mode") or "exact")
+            count = int(payload.get("count") or 3)
+            result = collect_web_articles(keyword, mode, count)
+        except ValueError as exc:
+            self.respond_error(400, str(exc))
+            return
+        except RuntimeError as exc:
+            self.respond_error(502, str(exc))
+            return
+
+        self.respond_json(result, status=201)
 
     def delete_article(self, article_id: int) -> None:
         with connect_db() as conn:

@@ -59,6 +59,24 @@
             <button class="ghost-button" id="copyBookmarkletButton" type="button">Copy</button>
           </div>
         </div>
+        <div class="web-collect-panel">
+          <div class="web-collect-head">
+            <div>
+              <span>Web Collect</span>
+              <strong id="webCollectStatus">Ready</strong>
+            </div>
+            <button class="primary-button" id="webCollectButton" type="button">Collect</button>
+          </div>
+          <div class="web-collect-grid">
+            <input id="webKeywordInput" type="search" autocomplete="off" placeholder="集めたいキーワード">
+            <input id="webCountInput" type="number" min="1" max="10" step="1" value="3" aria-label="件数">
+            <select id="webModeSelect" aria-label="検索モード">
+              <option value="exact">厳密</option>
+              <option value="fuzzy">あいまい</option>
+            </select>
+          </div>
+          <div class="web-collect-results" id="webCollectResults"></div>
+        </div>
         <div class="paste-frame">
           <div id="pasteSurface" class="paste-surface" contenteditable="true" spellcheck="false" aria-label="HTML paste area"></div>
         </div>
